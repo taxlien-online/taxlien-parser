@@ -9,13 +9,15 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 
+from config import PATH_CHROMEDRIVER, PATH_INPUT, PATH_OUTPUT
+
 chrome_options = Options()
 chrome_options.add_argument("--no-sandbox")
 chrome_options.add_argument("--headless")
 chrome_options.add_argument("--disable-gpu")
 
 
-service = Service('/path/to/chromedriver')
+service = Service(PATH_CHROMEDRIVER)
 driver = webdriver.Chrome(service=service, options=chrome_options)
 
 def extract_parcel_info(html_file):
