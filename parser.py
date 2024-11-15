@@ -254,8 +254,8 @@ def append_sql_to_file(sql_query, output_folder, filename):
 		with open(file_path, 'a', encoding='utf-8') as f:
 				f.write(sql_query)
 
-folder_path = '/path/to/input'
-output_folder = '/path/to/output'
+folder_path = PATH_INPUT
+output_folder = PATH_OUTPUT
 
 append_sql_to_file("INSERT INTO taxlien.parcels (parcel_id,owner,site_address,legal_description,property_tax_account) VALUES\n", output_folder, 'parcels.sql')
 append_sql_to_file("INSERT INTO taxlien.sales_history (parcel_id,sale_date,price,book_page,deed,vi) VALUES\n", output_folder, 'sales_history.sql')
