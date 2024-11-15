@@ -1,13 +1,13 @@
 import os
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup # type: ignore
 from datetime import datetime
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
+from selenium import webdriver # type: ignore
+from selenium.webdriver.common.by import By # type: ignore
+from selenium.webdriver.common.keys import Keys # type: ignore
+from selenium.webdriver.support.ui import WebDriverWait # type: ignore
+from selenium.webdriver.support import expected_conditions as EC # type: ignore
+from selenium.webdriver.chrome.service import Service # type: ignore
+from selenium.webdriver.chrome.options import Options # type: ignore
 
 from config import PATH_CHROMEDRIVER, PATH_INPUT, PATH_OUTPUT
 
@@ -29,20 +29,14 @@ def extract_parcel_info(html_file):
 						
 						if form:
 								parcel_id = form.find('input', {'name': 'Photo_PIN'})['value']
-								owner = form.find('input', {'name': 'strOwner'})['value'].replace('<br>', '; ')
-								site_address = form.find('input', {'name': 'strSiteAddress'})['value']
+								owner = form.find('input', {'name': 'strOwner'})['value'].replace('<br>', '; ').replace("'", "")
+								site_address = form.find('input', {'name': 'strSiteAddress'})['value'].replace("'", "")
 								legal_description = form.find('input', {'name': 'strLegal'})['value']
 								print(f"Извлечение данных - {parcel_id}")
 						else:
 								parcel_id = owner = site_address = legal_description = 'N/A'
 
-						open_tax_link = soup.find(string=lambda t: 'OpenTaxLink' in t)
-						pin = 'N/A'
-						if open_tax_link:
-								start = open_tax_link.find("linkTax/?PIN=")
-								if start != -1:
-										end = open_tax_link.find("&", start)
-										pin = open_tax_link[start+13:end] if end != -1 else open_tax_link[start+13:]
+						pin = 'R' +parcel_id[9:18]
 						
 						sales_history_table = soup.find(string=lambda text: text and 'Sales History' in text)
 
@@ -55,7 +49,7 @@ def extract_parcel_info(html_file):
 												cells = row.find_all('td')
 												if len(cells) >= 5:
 														
-														price = cells[1].text.strip().replace('$', '').replace(',', '')
+														price = cells[1].text.strip().replace('$', '').replace(',', '').replace('(', '').replace(')', '')
 														
 														sale_date = cells[0].text.strip()
 														sale_date = convert_date_format(sale_date)
@@ -96,8 +90,6 @@ def fetch_tax_payment_history(pin, parcel_id):
 				driver.get(url)
 
 				wait = WebDriverWait(driver, 30)
-
-				print(f"Извлечение PIN для Property Tax Account: {pin}")
 
 				try:
 						captcha_element = wait.until(EC.element_to_be_clickable((By.ID, 'MainContent_txtNumber3')))
@@ -144,7 +136,7 @@ def fetch_tax_payment_history(pin, parcel_id):
 												payment = {
 														'parcel_id': parcel_id,
 														'tax_year': cells[1].text.strip(),
-														'payment_date': convert_date_format(cells[5].text.strip()),  # Преобразуем дату
+														'payment_date': convert_date_format(cells[5].text.strip()),
 														'receipt_number': cells[3].text.strip(),
 														'paid_by': cells[4].text.strip(),
 														'paid_amount': cells[6].text.strip().replace('$', '').replace(',', '')
