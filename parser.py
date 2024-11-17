@@ -31,12 +31,12 @@ def extract_parcel_info(html_file):
 								parcel_id = form.find('input', {'name': 'Photo_PIN'})['value']
 								owner = form.find('input', {'name': 'strOwner'})['value'].replace('<br>', '; ').replace("'", "")
 								site_address = form.find('input', {'name': 'strSiteAddress'})['value'].replace("'", "")
-								legal_description = form.find('input', {'name': 'strLegal'})['value']
+								legal_description = form.find('input', {'name': 'strLegal'})['value'].replace('  ', ' ').replace("'", "").replace('(', '').replace(')', '')
 								print(f"Извлечение данных - {parcel_id}")
 						else:
 								parcel_id = owner = site_address = legal_description = 'N/A'
 
-						pin = 'R' +parcel_id[9:18]
+						pin = 'R' + parcel_id[9:18]
 						
 						sales_history_table = soup.find(string=lambda text: text and 'Sales History' in text)
 
