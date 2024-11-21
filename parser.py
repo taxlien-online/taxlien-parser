@@ -138,7 +138,7 @@ def fetch_tax_payment_history(pin, parcel_id):
 														'tax_year': cells[1].text.strip(),
 														'payment_date': convert_date_format(cells[5].text.strip()),
 														'receipt_number': cells[3].text.strip(),
-														'paid_by': cells[4].text.strip(),
+														'paid_by': cells[4].text.strip().replace(" &'", "'").replace(" & ", " and "),
 														'paid_amount': cells[6].text.strip().replace('$', '').replace(',', '')
 												}
 												tax_payment_history.append(payment)
