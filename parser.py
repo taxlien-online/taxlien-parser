@@ -1,4 +1,5 @@
 import os
+import argparse
 from bs4 import BeautifulSoup # type: ignore
 from datetime import datetime
 from selenium import webdriver # type: ignore
@@ -167,37 +168,31 @@ def convert_date_format(date_str):
 				print(f"Неверный формат даты: {date_str}")
 				return date_str
 
-def process_folder_sequential(folder_path, output_folder):
+def process_folder_sequential(folder_path, output_folder, start_file=None):
 		html_files = [os.path.join(folder_path, filename) for filename in os.listdir(folder_path) if filename.endswith('.html')]
 
-		pos = 0
-		for html_file in html_files:
-				pos += 1
+		# Найти индекс стартового файла
+		start_index = 0
+		if start_file:
+				try:
+						start_index = html_files.index(os.path.join(folder_path, start_file))
+				except ValueError:
+						print(f"Файл {start_file} не найден в папке. Начинаем с первого файла.")
+
+		for pos, html_file in enumerate(html_files[start_index:], start=start_index+1):
 				parcel_info = extract_parcel_info(html_file)
 				if parcel_info:
-						if pos < len(html_files):
-								parcels_sql = generate_parcels_sql([{
-										'parcel_id': parcel_info['parcel_id'],
-										'owner': parcel_info['owner'],
-										'site_address': parcel_info['site_address'],
-										'legal_description': parcel_info['legal_description'],
-										'property_tax_account': parcel_info['property_tax_account']
-								}], False)
+						is_last_file = pos == len(html_files)
+						parcels_sql = generate_parcels_sql([{
+								'parcel_id': parcel_info['parcel_id'],
+								'owner': parcel_info['owner'],
+								'site_address': parcel_info['site_address'],
+								'legal_description': parcel_info['legal_description'],
+								'property_tax_account': parcel_info['property_tax_account']
+						}], is_last_file)
+						sales_sql = generate_sales_sql(parcel_info['sales_history'], is_last_file)
+						tax_payment_sql = generate_tax_payment_sql(parcel_info['tax_payment_history'], is_last_file)
 
-								sales_sql = generate_sales_sql(parcel_info['sales_history'], False)
-								tax_payment_sql = generate_tax_payment_sql(parcel_info['tax_payment_history'], False)
-						else:
-								parcels_sql = generate_parcels_sql([{
-										'parcel_id': parcel_info['parcel_id'],
-										'owner': parcel_info['owner'],
-										'site_address': parcel_info['site_address'],
-										'legal_description': parcel_info['legal_description'],
-										'property_tax_account': parcel_info['property_tax_account']
-								}], True)
-
-								sales_sql = generate_sales_sql(parcel_info['sales_history'], True)
-								tax_payment_sql = generate_tax_payment_sql(parcel_info['tax_payment_history'], True)
-						
 						append_sql_to_file(parcels_sql, output_folder, 'parcels.sql')
 						append_sql_to_file(sales_sql, output_folder, 'sales_history.sql')
 						append_sql_to_file(tax_payment_sql, output_folder, 'tax_payment_history.sql')
@@ -246,11 +241,17 @@ def append_sql_to_file(sql_query, output_folder, filename):
 		with open(file_path, 'a', encoding='utf-8') as f:
 				f.write(sql_query)
 
-folder_path = PATH_INPUT
-output_folder = PATH_OUTPUT
+if __name__ == "__main__":
+		parser = argparse.ArgumentParser(description="Парсинг HTML файлов и генерация SQL.")
+		parser.add_argument("--start_file", type=str, help="Имя файла, с которого начать обработку.")
+		
+		args = parser.parse_args()
 
-append_sql_to_file("INSERT INTO taxlien.parcels (parcel_id,owner,site_address,legal_description,property_tax_account) VALUES\n", output_folder, 'parcels.sql')
-append_sql_to_file("INSERT INTO taxlien.sales_history (parcel_id,sale_date,price,book_page,deed,vi) VALUES\n", output_folder, 'sales_history.sql')
-append_sql_to_file("INSERT INTO taxlien.tax_payment_history (parcel_id,tax_year,payment_date,receipt_number,paid_by,paid_amount) VALUES\n", output_folder, 'tax_payment_history.sql')
+		folder_path = PATH_INPUT
+		output_folder = PATH_OUTPUT
 
-process_folder_sequential(folder_path, output_folder)
+		append_sql_to_file("INSERT INTO taxlien.parcels (parcel_id,owner,site_address,legal_description,property_tax_account) VALUES\n", output_folder, 'parcels.sql')
+		append_sql_to_file("INSERT INTO taxlien.sales_history (parcel_id,sale_date,price,book_page,deed,vi) VALUES\n", output_folder, 'sales_history.sql')
+		append_sql_to_file("INSERT INTO taxlien.tax_payment_history (parcel_id,tax_year,payment_date,receipt_number,paid_by,paid_amount) VALUES\n", output_folder, 'tax_payment_history.sql')
+
+		process_folder_sequential(folder_path, output_folder, start_file=args.start_file)
