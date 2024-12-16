@@ -72,7 +72,8 @@ def extract_parcel_info(html_file):
 								'legal_description': legal_description,
 								'sales_history': sales_history,
 								'property_tax_account': pin,
-								'tax_payment_history': tax_payment_history
+								'tax_payment_history': tax_payment_history[0],
+								'due_amount': tax_payment_history[1]
 						}
 		except Exception as e:
 				print(f"Ошибка при обработке {html_file}: {e}")
@@ -96,8 +97,6 @@ def fetch_tax_payment_history(pin, parcel_id):
 						captcha_element_present = driver.find_elements(By.ID, 'MainContent_txtNumber3')
 						
 						if captcha_element_present:
-								print(f"Капча обнаружена для PIN {pin}, начинаем решение.")
-								
 								captcha_element = wait.until(EC.element_to_be_clickable((By.ID, 'MainContent_txtNumber3')))
 								captcha_element.click()
 
@@ -114,20 +113,28 @@ def fetch_tax_payment_history(pin, parcel_id):
 								submit_button = driver.find_element(By.ID, 'MainContent_btnHuman')
 								submit_button.click()
 
-						else:
-								print(f"Капча не найдена для PIN {pin}, переходим к парсингу.")
-
 				except Exception as e:
 						print(f"Ошибка при вводе капчи или её проверке для PIN {pin}: {e}")
 
 				try:
 						soup = BeautifulSoup(driver.page_source, 'html.parser')
+
+						taxes_section = soup.find('table', {'id': 'MainContent_PropertyContainer_tpUnpaidBills_UnpaidBillsGrid'})
+						due_amount = None
+						if taxes_section:
+							rows = taxes_section.find_all('tr')
+							
+							for row in rows:
+									cells = row.find_all('td')
+									if len(cells) > 1 and cells[1].text.strip() == 'TOTAL':
+											due_amount = cells[4].text.strip().replace('$', '')
+											break
+
 						payment_history_section = soup.find('table', {'id': 'MainContent_PropertyContainer_tpTransactionHistory_TransactionHistoryGrid'})
 						tax_payment_history = []
 
 						if payment_history_section:
 								rows = payment_history_section.find_all('tr')
-								print(f"Извлечение истории налогов для PIN {pin}: {len(rows)}")
 								for row in rows[1:]:
 										cells = row.find_all('td')
 										if len(cells) >= 5:
@@ -140,21 +147,22 @@ def fetch_tax_payment_history(pin, parcel_id):
 														'paid_amount': cells[6].text.strip().replace('$', '').replace(',', '')
 												}
 												tax_payment_history.append(payment)
+
 						else:
 								print(f"Извлечение истории налогов для PIN {pin}: Нет таблицы истории налогов")
 
 						driver.quit()
-						return tax_payment_history
+						return tax_payment_history, due_amount
 
 				except Exception as e:
 						print(f"Ошибка при извлечении истории налогов для PIN {pin}: {e}")
 						driver.quit()
-						return []
+						return [], None
 
 		except Exception as e:
 				print(f"Ошибка при обработке истории налогов для PIN {pin}: {e}")
 				driver.quit()
-				return []
+				return [], None
 
 
 
@@ -169,7 +177,6 @@ def convert_date_format(date_str):
 def process_folder_sequential(folder_path, output_folder, start_file=None):
 		html_files = [os.path.join(folder_path, filename) for filename in os.listdir(folder_path) if filename.endswith('.html')]
 
-		# Найти индекс стартового файла
 		start_index = 0
 		if start_file:
 				try:
@@ -186,7 +193,8 @@ def process_folder_sequential(folder_path, output_folder, start_file=None):
 								'owner': parcel_info['owner'],
 								'site_address': parcel_info['site_address'],
 								'legal_description': parcel_info['legal_description'],
-								'property_tax_account': parcel_info['property_tax_account']
+								'property_tax_account': parcel_info['property_tax_account'],
+								'due_amount': parcel_info['due_amount']
 						}], is_last_file)
 						sales_sql = generate_sales_sql(parcel_info['sales_history'], is_last_file)
 						tax_payment_sql = generate_tax_payment_sql(parcel_info['tax_payment_history'], is_last_file)
@@ -199,7 +207,7 @@ def generate_parcels_sql(data, last):
 		sql_query = ""
 		values = []
 		for parcel in data:
-				value = f"('{parcel['parcel_id']}', '{parcel['owner']}', '{parcel['site_address']}', '{parcel['legal_description']}', '{parcel['property_tax_account']}')"
+				value = f"('{parcel['parcel_id']}', '{parcel['owner']}', '{parcel['site_address']}', '{parcel['legal_description']}', '{parcel['property_tax_account']}', '{parcel.get('due_amount', '0')}')"
 				values.append(value)
 		sql_query += ",\n".join(values)
 		if last:
@@ -248,7 +256,7 @@ if __name__ == "__main__":
 		folder_path = PATH_INPUT
 		output_folder = PATH_OUTPUT
 
-		append_sql_to_file("INSERT INTO taxlien.parcels (parcel_id,owner,site_address,legal_description,property_tax_account) VALUES\n", output_folder, 'parcels.sql')
+		append_sql_to_file("INSERT INTO taxlien.parcels (parcel_id,owner,site_address,legal_description,property_tax_account,due_amount) VALUES\n", output_folder, 'parcels.sql')
 		append_sql_to_file("INSERT INTO taxlien.sales_history (parcel_id,sale_date,price,book_page,deed,vi) VALUES\n", output_folder, 'sales_history.sql')
 		append_sql_to_file("INSERT INTO taxlien.tax_payment_history (parcel_id,tax_year,payment_date,receipt_number,paid_by,paid_amount) VALUES\n", output_folder, 'tax_payment_history.sql')
 
