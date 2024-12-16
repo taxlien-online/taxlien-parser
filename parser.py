@@ -93,35 +93,32 @@ def fetch_tax_payment_history(pin, parcel_id):
 				wait = WebDriverWait(driver, 30)
 
 				try:
-						captcha_element = wait.until(EC.element_to_be_clickable((By.ID, 'MainContent_txtNumber3')))
-						captcha_element.click()
+						captcha_element_present = driver.find_elements(By.ID, 'MainContent_txtNumber3')
+						
+						if captcha_element_present:
+								print(f"Капча обнаружена для PIN {pin}, начинаем решение.")
+								
+								captcha_element = wait.until(EC.element_to_be_clickable((By.ID, 'MainContent_txtNumber3')))
+								captcha_element.click()
+
+								number1 = int(driver.find_element(By.ID, 'MainContent_lblNumber1').text)
+								number2 = int(driver.find_element(By.ID, 'MainContent_lblNumber2').text)
+								result = number1 + number2
+
+								captcha_input = driver.find_element(By.ID, 'MainContent_txtNumber3')
+								captcha_input.send_keys(str(result))
+
+								human_checkbox = driver.find_element(By.ID, 'MainContent_chkHuman')
+								human_checkbox.click()
+
+								submit_button = driver.find_element(By.ID, 'MainContent_btnHuman')
+								submit_button.click()
+
+						else:
+								print(f"Капча не найдена для PIN {pin}, переходим к парсингу.")
+
 				except Exception as e:
-						print(f"Ошибка при клике по элементу Captcha для PIN {pin}: {e}")
-						driver.quit()
-						return []
-
-				try:
-						number1 = int(driver.find_element(By.ID, 'MainContent_lblNumber1').text)
-						number2 = int(driver.find_element(By.ID, 'MainContent_lblNumber2').text)
-						result = number1 + number2
-				except Exception as e:
-						print(f"Ошибка при получении значений для капчи на PIN {pin}: {e}")
-						driver.quit()
-						return []
-
-				try:
-						captcha_input = driver.find_element(By.ID, 'MainContent_txtNumber3')
-						captcha_input.send_keys(str(result))
-
-						human_checkbox = driver.find_element(By.ID, 'MainContent_chkHuman')
-						human_checkbox.click()
-
-						submit_button = driver.find_element(By.ID, 'MainContent_btnHuman')
-						submit_button.click()
-				except Exception as e:
-						print(f"Ошибка при вводе капчи или отправке формы для PIN {pin}: {e}")
-						driver.quit()
-						return []
+						print(f"Ошибка при вводе капчи или её проверке для PIN {pin}: {e}")
 
 				try:
 						soup = BeautifulSoup(driver.page_source, 'html.parser')
@@ -153,11 +150,12 @@ def fetch_tax_payment_history(pin, parcel_id):
 						print(f"Ошибка при извлечении истории налогов для PIN {pin}: {e}")
 						driver.quit()
 						return []
-				
+
 		except Exception as e:
 				print(f"Ошибка при обработке истории налогов для PIN {pin}: {e}")
 				driver.quit()
 				return []
+
 
 
 def convert_date_format(date_str):
