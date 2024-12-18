@@ -73,7 +73,8 @@ def extract_parcel_info(html_file):
 								'sales_history': sales_history,
 								'property_tax_account': pin,
 								'tax_payment_history': tax_payment_history[0],
-								'due_amount': tax_payment_history[1]
+								'total_due_amount': tax_payment_history[1],
+								'last_year_due_amount': tax_payment_history[2]
 						}
 		except Exception as e:
 				print(f"Ошибка при обработке {html_file}: {e}")
@@ -120,15 +121,17 @@ def fetch_tax_payment_history(pin, parcel_id):
 						soup = BeautifulSoup(driver.page_source, 'html.parser')
 
 						taxes_section = soup.find('table', {'id': 'MainContent_PropertyContainer_tpUnpaidBills_UnpaidBillsGrid'})
-						due_amount = None
+						total_due_amount = 0
+						last_year_due_amount = 0
 						if taxes_section:
 							rows = taxes_section.find_all('tr')
 							
 							for row in rows:
-									cells = row.find_all('td')
-									if len(cells) > 1 and cells[1].text.strip() == 'TOTAL':
-											due_amount = cells[4].text.strip().replace('$', '')
-											break
+								cells = row.find_all('td')
+								if len(cells) > 1 and cells[1].text.strip() == 'TOTAL':
+									total_due_amount = cells[5].text.strip().replace('$', '')
+								if len(cells) > 1 and cells[3].text.strip() == 'Current':
+									last_year_due_amount = cells[5].text.strip().replace('$', '')
 
 						payment_history_section = soup.find('table', {'id': 'MainContent_PropertyContainer_tpTransactionHistory_TransactionHistoryGrid'})
 						tax_payment_history = []
@@ -152,7 +155,7 @@ def fetch_tax_payment_history(pin, parcel_id):
 								print(f"Извлечение истории налогов для PIN {pin}: Нет таблицы истории налогов")
 
 						driver.quit()
-						return tax_payment_history, due_amount
+						return tax_payment_history, total_due_amount, last_year_due_amount
 
 				except Exception as e:
 						print(f"Ошибка при извлечении истории налогов для PIN {pin}: {e}")
@@ -194,7 +197,8 @@ def process_folder_sequential(folder_path, output_folder, start_file=None):
 								'site_address': parcel_info['site_address'],
 								'legal_description': parcel_info['legal_description'],
 								'property_tax_account': parcel_info['property_tax_account'],
-								'due_amount': parcel_info['due_amount']
+								'total_due_amount': parcel_info['total_due_amount'],
+								'last_year_due_amount': parcel_info['last_year_due_amount']
 						}], is_last_file)
 						sales_sql = generate_sales_sql(parcel_info['sales_history'], is_last_file)
 						tax_payment_sql = generate_tax_payment_sql(parcel_info['tax_payment_history'], is_last_file)
@@ -207,7 +211,7 @@ def generate_parcels_sql(data, last):
 		sql_query = ""
 		values = []
 		for parcel in data:
-				value = f"('{parcel['parcel_id']}', '{parcel['owner']}', '{parcel['site_address']}', '{parcel['legal_description']}', '{parcel['property_tax_account']}', '{parcel.get('due_amount', '0')}')"
+				value = f"('{parcel['parcel_id']}', '{parcel['owner']}', '{parcel['site_address']}', '{parcel['legal_description']}', '{parcel['property_tax_account']}', '{parcel.get('total_due_amount', '0')}', '{parcel.get('last_year_due_amount', '0')}')"
 				values.append(value)
 		sql_query += ",\n".join(values)
 		if last:
@@ -256,7 +260,7 @@ if __name__ == "__main__":
 		folder_path = PATH_INPUT
 		output_folder = PATH_OUTPUT
 
-		append_sql_to_file("INSERT INTO taxlien.parcels (parcel_id,owner,site_address,legal_description,property_tax_account,due_amount) VALUES\n", output_folder, 'parcels.sql')
+		append_sql_to_file("INSERT INTO taxlien.parcels (parcel_id,owner,site_address,legal_description,property_tax_account,total_due_amount,last_year_due_amount) VALUES\n", output_folder, 'parcels.sql')
 		append_sql_to_file("INSERT INTO taxlien.sales_history (parcel_id,sale_date,price,book_page,deed,vi) VALUES\n", output_folder, 'sales_history.sql')
 		append_sql_to_file("INSERT INTO taxlien.tax_payment_history (parcel_id,tax_year,payment_date,receipt_number,paid_by,paid_amount) VALUES\n", output_folder, 'tax_payment_history.sql')
 
